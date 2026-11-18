@@ -402,14 +402,31 @@ def validate_provider_protocol(errors: list[str]) -> None:
                 "permissions:\n  contents: read",
                 "runs-on: ubuntu-24.04",
                 "name: test",
-                "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
-                "run: python3 cli-tools/validate_public_contracts.py",
+                "hosted-runner: ubuntu-24.04",
+                "needs: [check]",
+                'run: test "$CHECK_RESULT" = success',
             ):
                 require(
                     fragment in workflow,
                     f"test.yml is missing required release-check fragment: {fragment!r}",
                     errors,
                 )
+            require(
+                re.search(
+                    r"uses: NDDev-Technocracy-OpenNetwork/nddev-ci/"
+                    r"\.github/workflows/check\.yml@[0-9a-f]{40}\b",
+                    workflow,
+                ) is not None,
+                "test.yml must pin the shared public check by commit",
+                errors,
+            )
+            justfile = ROOT / "justfile"
+            require(
+                justfile.is_file()
+                and "python3 -B cli-tools/validate_public_contracts.py" in justfile.read_text(encoding="utf-8"),
+                "justfile must retain the public contract validator",
+                errors,
+            )
             require(
                 "pull_request_target" not in workflow and "${{ secrets" not in workflow,
                 "test.yml may not use privileged PR triggers or repository secrets",
